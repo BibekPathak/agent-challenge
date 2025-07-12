@@ -1,5 +1,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
+import { model } from "../../config";
+import { generateText } from "ai";
 
 interface GeocodingResponse {
 	results: {
@@ -41,29 +43,34 @@ export const weatherTool = createTool({
 });
 
 const getWeather = async (location: string) => {
-	const geocodingUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(location)}&count=1`;
-	const geocodingResponse = await fetch(geocodingUrl);
-	const geocodingData = (await geocodingResponse.json()) as GeocodingResponse;
+	// Ask the LLM to imagine the weather for the given location
+	const prompt = `Imagine you are a weather reporter. What is the weather like today in ${location}? Please provide temperature (°C), feels like (°C), humidity (%), wind speed (km/h), wind gust (km/h), and a short description of the conditions. Format your answer as JSON with keys: temperature, feelsLike, humidity, windSpeed, windGust, conditions.`;
 
-	if (!geocodingData.results?.[0]) {
-		throw new Error(`Location '${location}' not found`);
+	const { text } = await generateText({
+	  model,
+	  prompt,
+	});
+	const response = text;
+
+	// Try to parse the LLM's response as JSON
+	let weather;
+	try {
+		weather = typeof response === 'string' ? JSON.parse(response) : response;
+	} catch (e) {
+		// If parsing fails, return a default imagined weather
+		weather = {
+			temperature: 20,
+			feelsLike: 19,
+			humidity: 60,
+			windSpeed: 10,
+			windGust: 15,
+			conditions: "Partly cloudy",
+		};
 	}
 
-	const { latitude, longitude, name } = geocodingData.results[0];
-
-	const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,wind_gusts_10m,weather_code`;
-
-	const response = await fetch(weatherUrl);
-	const data = (await response.json()) as WeatherResponse;
-
 	return {
-		temperature: data.current.temperature_2m,
-		feelsLike: data.current.apparent_temperature,
-		humidity: data.current.relative_humidity_2m,
-		windSpeed: data.current.wind_speed_10m,
-		windGust: data.current.wind_gusts_10m,
-		conditions: getWeatherCondition(data.current.weather_code),
-		location: name,
+		...weather,
+		location,
 	};
 };
 

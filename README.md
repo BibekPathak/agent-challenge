@@ -41,6 +41,39 @@ pnpm run dev
 Welcome to the Nosana AI Agent Hackathon! Your mission is to build and deploy an AI agent on Nosana.
 While we provide a weather agent as an example, your creativity is the limit. Build agents that:
 
+### My Arbitrage Agent
+
+I've built an **Arbitrage Detection Agent** that monitors betting platforms like Probo and Polymarket to identify profitable trading opportunities. The agent:
+
+- **Fetches orderbooks** from multiple betting platforms
+- **Calculates arbitrage opportunities** by comparing bid/ask spreads
+- **Provides actionable trading recommendations** with profit percentages
+- **Analyzes multiple markets** simultaneously for comprehensive insights
+- **Warns about execution risks** and market volatility
+
+**Key Features:**
+- Real-time orderbook analysis
+- Profit calculation and ranking
+- Risk assessment and warnings
+- Multi-market monitoring workflow
+- Clear execution instructions
+
+**Usage Examples:**
+- "Check arbitrage for market ABC123"
+- "Analyze opportunities across markets XYZ, DEF, GHI"
+- "What's the best arbitrage opportunity right now?"
+
+The agent is located in `src/mastra/agents/arb-agent/` and includes:
+- `arb-agent.ts` - Main agent with arbitrage expertise
+- `arb-tool.ts` - Tool for fetching and analyzing orderbooks
+- `arb-workflow.ts` - Workflow for multi-market analysis
+- `arb-test.ts` - Test file for verification
+
+### Challenge Overview
+
+Welcome to the Nosana AI Agent Hackathon! Your mission is to build and deploy an AI agent on Nosana.
+While we provide a weather agent as an example, your creativity is the limit. Build agents that:
+
 **Beginner Level:**
 
 - **Simple Calculator**: Perform basic math operations with explanations
