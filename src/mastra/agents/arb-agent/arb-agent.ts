@@ -1,5 +1,5 @@
 import { Agent } from "@mastra/core/agent";
-import { arbitrageTool } from "./arb-tool";
+import { arbitrageTool, listProboMarketsTool, listPolymarketMarketsTool } from "./arb-tool";
 import { model } from "../../config";
 
 const name = "Arbitrage Agent";
@@ -31,5 +31,5 @@ export const arbitrageAgent = new Agent({
 	name,
 	instructions,
 	model,
-	tools: { arbitrageTool },
+	tools: { arbitrageTool, listProboMarketsTool, listPolymarketMarketsTool },
 });

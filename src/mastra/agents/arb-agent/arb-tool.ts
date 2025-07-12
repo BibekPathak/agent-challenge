@@ -17,7 +17,9 @@ interface ArbitrageOpportunity {
   platform2: string;
   market: string;
   buyPrice: number;
+  buyPriceINR?: number;
   sellPrice: number;
+  sellPriceINR?: number;
   profit: number;
   profitPercentage: number;
   buySize: number;
@@ -28,20 +30,20 @@ interface ArbitrageOpportunity {
 // Mock data for demonstration - in real implementation, these would be API calls
 const mockProboOrderbook: Orderbook = {
   bids: [
-    { price: 0.45, size: 100 },
-    { price: 0.44, size: 200 },
-    { price: 0.43, size: 150 },
+    { price: 38.0, size: 100 }, // INR
+    { price: 37.5, size: 200 },
+    { price: 37.0, size: 150 },
   ],
   asks: [
-    { price: 0.46, size: 100 },
-    { price: 0.47, size: 200 },
-    { price: 0.48, size: 150 },
+    { price: 38.5, size: 100 },
+    { price: 39.0, size: 200 },
+    { price: 39.5, size: 150 },
   ],
 };
 
 const mockPolymarketOrderbook: Orderbook = {
   bids: [
-    { price: 0.48, size: 100 },
+    { price: 0.48, size: 100 }, // USD
     { price: 0.47, size: 200 },
     { price: 0.46, size: 150 },
   ],
@@ -50,6 +52,19 @@ const mockPolymarketOrderbook: Orderbook = {
     { price: 0.50, size: 200 },
     { price: 0.51, size: 150 },
   ],
+};
+
+// Fetch INR to USD exchange rate
+const getINRtoUSD = async (): Promise<number> => {
+  try {
+    const response = await fetch('https://api.exchangerate.host/latest?base=INR&symbols=USD');
+    const data = await response.json();
+    return data.rates.USD;
+  } catch (error) {
+    console.error('Error fetching INR to USD rate:', error);
+    // Fallback to a default rate if API fails
+    return 0.012;
+  }
 };
 
 // Function to fetch orderbook from Probo (mock implementation)
@@ -61,10 +76,7 @@ const fetchProboOrderbook = async (marketId: string): Promise<Orderbook> => {
   // return data.orderbook;
   
   console.log(`Fetching Probo orderbook for market: ${marketId}`);
-  
-  // Simulate API delay
   await new Promise(resolve => setTimeout(resolve, 100));
-  
   return mockProboOrderbook;
 };
 
@@ -77,67 +89,72 @@ const fetchPolymarketOrderbook = async (marketId: string): Promise<Orderbook> =>
   // return data.orderbook;
   
   console.log(`Fetching Polymarket orderbook for market: ${marketId}`);
-  
-  // Simulate API delay
   await new Promise(resolve => setTimeout(resolve, 100));
-  
   return mockPolymarketOrderbook;
 };
 
 // Function to calculate arbitrage opportunities
 const calculateArbitrage = (
-  proboOrderbook: Orderbook,
+  proboOrderbookUSD: Orderbook,
+  proboOrderbookINR: Orderbook,
   polymarketOrderbook: Orderbook,
-  marketId: string
+  marketId: string,
+  inrToUsd: number
 ): ArbitrageOpportunity[] => {
   const opportunities: ArbitrageOpportunity[] = [];
 
-  // Check if we can buy on Probo and sell on Polymarket
-  const proboBestAsk = proboOrderbook.asks[0]; // Best ask (lowest sell price)
-  const polymarketBestBid = polymarketOrderbook.bids[0]; // Best bid (highest buy price)
+  // Check if we can buy on Probo (INR->USD) and sell on Polymarket (USD)
+  const proboBestAskUSD = proboOrderbookUSD.asks[0]; // Best ask (lowest sell price, USD)
+  const proboBestAskINR = proboOrderbookINR.asks[0]; // INR
+  const polymarketBestBid = polymarketOrderbook.bids[0]; // Best bid (highest buy price, USD)
 
-  if (proboBestAsk && polymarketBestBid) {
-    const buyPrice = proboBestAsk.price;
-    const sellPrice = polymarketBestBid.price;
+  if (proboBestAskUSD && proboBestAskINR && polymarketBestBid) {
+    const buyPrice = proboBestAskUSD.price; // USD
+    const buyPriceINR = proboBestAskINR.price; // INR
+    const sellPrice = polymarketBestBid.price; // USD
     const profit = sellPrice - buyPrice;
     const profitPercentage = (profit / buyPrice) * 100;
     const isProfitable = profit > 0;
 
     opportunities.push({
-      platform1: "Probo",
-      platform2: "Polymarket",
+      platform1: "Probo (converted to USD)",
+      platform2: "Polymarket (USD)",
       market: marketId,
       buyPrice,
+      buyPriceINR,
       sellPrice,
       profit,
       profitPercentage,
-      buySize: Math.min(proboBestAsk.size, polymarketBestBid.size),
-      sellSize: Math.min(proboBestAsk.size, polymarketBestBid.size),
+      buySize: Math.min(proboBestAskUSD.size, polymarketBestBid.size),
+      sellSize: Math.min(proboBestAskUSD.size, polymarketBestBid.size),
       isProfitable,
     });
   }
 
-  // Check if we can buy on Polymarket and sell on Probo
-  const polymarketBestAsk = polymarketOrderbook.asks[0];
-  const proboBestBid = proboOrderbook.bids[0];
+  // Check if we can buy on Polymarket (USD) and sell on Probo (USD, converted from INR)
+  const polymarketBestAsk = polymarketOrderbook.asks[0]; // USD
+  const proboBestBidUSD = proboOrderbookUSD.bids[0]; // USD
+  const proboBestBidINR = proboOrderbookINR.bids[0]; // INR
 
-  if (polymarketBestAsk && proboBestBid) {
-    const buyPrice = polymarketBestAsk.price;
-    const sellPrice = proboBestBid.price;
+  if (polymarketBestAsk && proboBestBidUSD && proboBestBidINR) {
+    const buyPrice = polymarketBestAsk.price; // USD
+    const sellPrice = proboBestBidUSD.price; // USD
+    const sellPriceINR = proboBestBidINR.price; // INR
     const profit = sellPrice - buyPrice;
     const profitPercentage = (profit / buyPrice) * 100;
     const isProfitable = profit > 0;
 
     opportunities.push({
-      platform1: "Polymarket",
-      platform2: "Probo",
+      platform1: "Polymarket (USD)",
+      platform2: "Probo (converted to USD)",
       market: marketId,
       buyPrice,
       sellPrice,
+      sellPriceINR,
       profit,
       profitPercentage,
-      buySize: Math.min(polymarketBestAsk.size, proboBestBid.size),
-      sellSize: Math.min(polymarketBestAsk.size, proboBestBid.size),
+      buySize: Math.min(polymarketBestAsk.size, proboBestBidUSD.size),
+      sellSize: Math.min(polymarketBestAsk.size, proboBestBidUSD.size),
       isProfitable,
     });
   }
@@ -147,7 +164,7 @@ const calculateArbitrage = (
 
 export const arbitrageTool = createTool({
   id: "check-arbitrage",
-  description: "Check for arbitrage opportunities between Probo and Polymarket for a specific market",
+  description: "Check for arbitrage opportunities between Probo (INR) and Polymarket (USD) for a specific market. Probo prices are converted to USD using the latest exchange rate.",
   inputSchema: z.object({
     marketId: z.string().describe("Market ID to check for arbitrage opportunities"),
   }),
@@ -157,7 +174,9 @@ export const arbitrageTool = createTool({
       platform2: z.string(),
       market: z.string(),
       buyPrice: z.number(),
+      buyPriceINR: z.number().optional(),
       sellPrice: z.number(),
+      sellPriceINR: z.number().optional(),
       profit: z.number(),
       profitPercentage: z.number(),
       buySize: z.number(),
@@ -165,31 +184,53 @@ export const arbitrageTool = createTool({
       isProfitable: z.boolean(),
     })),
     summary: z.string(),
+    inrToUsd: z.number(),
     timestamp: z.string(),
   }),
   execute: async ({ context }) => {
     const { marketId } = context;
 
     try {
+      // Fetch exchange rate
+      const inrToUsd = await getINRtoUSD();
+
       // Fetch orderbooks from both platforms
-      const [proboOrderbook, polymarketOrderbook] = await Promise.all([
+      const [proboOrderbookINR, polymarketOrderbook] = await Promise.all([
         fetchProboOrderbook(marketId),
         fetchPolymarketOrderbook(marketId),
       ]);
 
+      // Convert Probo orderbook prices to USD
+      const proboOrderbookUSD: Orderbook = {
+        bids: proboOrderbookINR.bids.map(bid => ({ ...bid, price: parseFloat((bid.price * inrToUsd).toFixed(4)) })),
+        asks: proboOrderbookINR.asks.map(ask => ({ ...ask, price: parseFloat((ask.price * inrToUsd).toFixed(4)) })),
+      };
+
       // Calculate arbitrage opportunities
-      const opportunities = calculateArbitrage(proboOrderbook, polymarketOrderbook, marketId);
+      const opportunities = calculateArbitrage(proboOrderbookUSD, proboOrderbookINR, polymarketOrderbook, marketId, inrToUsd);
 
       // Filter profitable opportunities
       const profitableOpportunities = opportunities.filter(opp => opp.isProfitable);
 
       // Create summary
-      let summary = `Found ${opportunities.length} arbitrage opportunities for market ${marketId}. `;
+      let summary = `INR→USD rate: ${inrToUsd}\nFound ${opportunities.length} arbitrage opportunities for market ${marketId}. `;
       if (profitableOpportunities.length > 0) {
         const bestOpportunity = profitableOpportunities.reduce((best, current) => 
           current.profitPercentage > best.profitPercentage ? current : best
         );
-        summary += `Best opportunity: Buy on ${bestOpportunity.platform1} at ${bestOpportunity.buyPrice} and sell on ${bestOpportunity.platform2} at ${bestOpportunity.sellPrice} for ${bestOpportunity.profitPercentage.toFixed(2)}% profit.`;
+        summary += `Best opportunity: Buy on ${bestOpportunity.platform1} at `;
+        if (bestOpportunity.buyPriceINR !== undefined) {
+          summary += `₹${bestOpportunity.buyPriceINR} (≈$${bestOpportunity.buyPrice})`;
+        } else {
+          summary += `$${bestOpportunity.buyPrice}`;
+        }
+        summary += ` and sell on ${bestOpportunity.platform2} at `;
+        if (bestOpportunity.sellPriceINR !== undefined) {
+          summary += `₹${bestOpportunity.sellPriceINR} (≈$${bestOpportunity.sellPrice})`;
+        } else {
+          summary += `$${bestOpportunity.sellPrice}`;
+        }
+        summary += ` for ${bestOpportunity.profitPercentage.toFixed(2)}% profit.`;
       } else {
         summary += "No profitable arbitrage opportunities found.";
       }
@@ -197,6 +238,7 @@ export const arbitrageTool = createTool({
       return {
         opportunities,
         summary,
+        inrToUsd,
         timestamp: new Date().toISOString(),
       };
     } catch (error) {
@@ -204,8 +246,61 @@ export const arbitrageTool = createTool({
       return {
         opportunities: [],
         summary: `Error checking arbitrage for market ${marketId}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        inrToUsd: 0,
         timestamp: new Date().toISOString(),
       };
     }
+  },
+});
+
+// Tool to list Probo markets
+export const listProboMarketsTool = createTool({
+  id: "list-probo-markets",
+  description: "List available Probo markets (mocked)",
+  inputSchema: z.object({}),
+  outputSchema: z.object({
+    markets: z.array(z.object({
+      id: z.string(),
+      name: z.string(),
+    })),
+  }),
+  execute: async () => {
+    // Example API call:
+    // const response = await fetch('https://api.probo.com/v1/markets');
+    // const data = await response.json();
+    // return { markets: data.markets.map((m: any) => ({ id: m.id, name: m.name })) };
+    // For now, return mock data:
+    return {
+      markets: [
+        { id: "12345", name: "Will India win the next cricket match?" },
+        { id: "67890", name: "Will BTC close above $60k this week?" },
+      ],
+    };
+  },
+});
+
+// Tool to list Polymarket markets
+export const listPolymarketMarketsTool = createTool({
+  id: "list-polymarket-markets",
+  description: "List available Polymarket markets (mocked)",
+  inputSchema: z.object({}),
+  outputSchema: z.object({
+    markets: z.array(z.object({
+      id: z.string(),
+      question: z.string(),
+    })),
+  }),
+  execute: async () => {
+    // Example API call:
+    // const response = await fetch('https://api.polymarket.com/v1/markets');
+    // const data = await response.json();
+    // return { markets: data.markets.map((m: any) => ({ id: m.id, question: m.question })) };
+    // For now, return mock data:
+    return {
+      markets: [
+        { id: "0xabc123", question: "Will ETH be above $3,000 on July 31?" },
+        { id: "0xdef456", question: "Will it rain in London tomorrow?" },
+      ],
+    };
   },
 });
