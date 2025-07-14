@@ -20,7 +20,7 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Copy package files
-COPY .env package.json pnpm-lock.yaml ./
+# COPY .env.docker package.json pnpm-lock.yaml ./
 
 # Install dependencies
 RUN pnpm install
@@ -29,10 +29,10 @@ RUN pnpm install
 COPY . .
 
 # Build the project
-RUN pnpm run build
+# RUN pnpm run build
 
 # Override the default entrypoint
 ENTRYPOINT ["/bin/sh", "-c"]
 
 # Start Ollama service and pull the model, then run the app
-CMD ["ollama serve & sleep 5 && ollama pull ${MODEL_NAME_AT_ENDPOINT} && node .mastra/output/index.mjs"]
+CMD ["ollama serve & sleep 5 && ollama pull ${MODEL_NAME_AT_ENDPOINT} && pnpm run dev"]
